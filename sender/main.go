@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
@@ -38,6 +39,18 @@ var (
 func main() {
 	// create a nats connection
 	// consume the message from the queue with task id then send the result to it
+	// run shell command to get the result
+	scriptPath := "./task.sh"
+	cmd := exec.Command("bash", scriptPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Error running script: %v\nOutput: %s", err, output)
+	}
+
+
+
+
+
 	// the message will be sent to the topic
 	logger,err := zap.NewProduction()
 	if err != nil {
@@ -64,19 +77,9 @@ func main() {
 
 			// send the result to the topic
 			// read the resulst.txt file
-			file, err := os.Open("output.txt")
-			if err != nil {
-				log.Fatalf("failed to open file: %v", err)
-			}
-			defer file.Close()
-			// read the file
-			data := make([]byte, 1024*1024*10)
-			count, err := file.Read(data)
-			if err != nil {
-				log.Fatalf("failed to read file: %v", err)
-			}
+			
 			// send the result to the topic
-			err = sendGRPC(ctx,data[:count],logger)
+			err = sendGRPC(ctx,output,logger)
 			if err != nil {
 				logger.Error("Failed to publish ComplianceReportJob results", zap.Error(err))
 			}

@@ -1,8 +1,3 @@
-# Write your Dockerfile here
-FROM alpine:latest
-
-RUN ./example.sh > /sender/output.txt
-
 # Do not change the code below
 # Run The Sender Go Application
 FROM golang:1.23-alpine AS Final

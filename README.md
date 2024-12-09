@@ -13,7 +13,7 @@ Defining a task has 2 main parts:
 ### 1. Code
 
 First part is the code that will be executed. It can be a shell script, python script, or any other executable file.
-We Use [task.sh](./task.sh) as an example.
+We Use [task.sh](./sender/task.sh) as an example.
 
 ```shell
 #!/bin/bash
@@ -27,10 +27,6 @@ Second part is the Dockerfile that will be used to build the task image. It shou
 
 ```dockerfile
 # Use a base image
-FROM ubuntu:20.04
-
-# Write your Dockerfile here
-# Need to write the output to /sender/result.txt
 # Do not change the code below
 # Run The Sender Go Application
 FROM golang:1.23-alpine AS Final
