@@ -1,6 +1,7 @@
 # Tasks Template
 
 Define a Task Image for Run by Opencomply Platform. User Can Define a Task Image and Run it on Opencomply Platform.
+You can fork this repository and create your own task image.
 
 ## Task Definition
 
