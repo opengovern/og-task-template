@@ -1,11 +1,7 @@
 # Write your Dockerfile here
-From Ubuntu:latest
+FROM alpine:latest
 
-Run ./example.sh > /sender/output.txt
-
-
-
-
+RUN ./example.sh > /sender/output.txt
 
 # Do not change the code below
 # Run The Sender Go Application
