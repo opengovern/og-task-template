@@ -38,6 +38,8 @@ func NewWorker(
 		return nil, err
 	}
 
+	logger.Info("Subscribing to stream", zap.String("stream", StreamName),
+		zap.Strings("topics", []string{TopicName, ResultTopicName}))
 	if err := jq.Stream(ctx, StreamName, "task job queue", []string{TopicName, ResultTopicName}, 100); err != nil {
 		logger.Error("failed to create stream", zap.Error(err))
 		return nil, err
@@ -111,7 +113,10 @@ func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) (err err
 		return err
 	}
 
-	var response *scheduler.TaskResponse
+	response := &scheduler.TaskResponse{
+		RunID:  request.RunID,
+		Status: models.TaskRunStatusInProgress,
+	}
 
 	defer func() {
 		if err != nil {
@@ -132,8 +137,6 @@ func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) (err err
 		}
 	}()
 
-	response.RunID = request.RunID
-	response.Status = models.TaskRunStatusInProgress
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		w.logger.Error("failed to create response json", zap.Error(err))
