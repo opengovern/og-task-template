@@ -1,11 +1,16 @@
-# Do not change the code below
-# Run The Sender Go Application
-FROM golang:1.23-alpine 
-# Copy the source code
-COPY . .
-# Download the dependencies
-RUN cd sender && go mod download -x
-# Build the Go application
-RUN cd sender &&   go build -o task .
+# Build stage
+FROM golang:1.23-alpine AS build
 
-ENTRYPOINT ["./sender/task"]
+# Build your Go binary
+WORKDIR /app
+COPY . .
+RUN go build -o og-task-template main.go
+
+# Final minimal image
+FROM scratch
+
+# Copy CA certificates
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy og-task-grype binary
+COPY --from=build /app/og-task-template /og-task-template

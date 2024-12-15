@@ -3,24 +3,24 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	fmt "fmt"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/opencomply/og-task-template/task"
 	"github.com/opengovern/og-util/pkg/jq"
 	"github.com/opengovern/opencomply/services/tasks/db/models"
 	"github.com/opengovern/opencomply/services/tasks/scheduler"
+	"github.com/opengovern/opencomply/services/tasks/worker/consts"
 	"go.uber.org/zap"
 	"os"
-	"os/exec"
 	"time"
 )
 
 var (
-	NatsURL         = os.Getenv("NATS_URL")
-	NatsConsumer    = os.Getenv("NATS_CONSUMER")
-	StreamName      = os.Getenv("NATS_STREAM_NAME")
-	TopicName       = os.Getenv("NATS_TOPIC_NAME")
-	ResultTopicName = os.Getenv("NATS_RESULT_TOPIC_NAME")
+	NatsURL         = os.Getenv(consts.NatsURLEnv)
+	NatsConsumer    = os.Getenv(consts.NatsConsumerEnv)
+	StreamName      = os.Getenv(consts.NatsStreamNameEnv)
+	TopicName       = os.Getenv(consts.NatsTopicNameEnv)
+	ResultTopicName = os.Getenv(consts.NatsResultTopicNameEnv)
 )
 
 type Worker struct {
@@ -38,7 +38,7 @@ func NewWorker(
 		return nil, err
 	}
 
-	if err := jq.Stream(ctx, StreamName, "task job queue", []string{TopicName}, 200000); err != nil {
+	if err := jq.Stream(ctx, StreamName, "task job queue", []string{TopicName, ResultTopicName}, 100); err != nil {
 		logger.Error("failed to create stream", zap.Error(err))
 		return nil, err
 	}
@@ -65,18 +65,27 @@ func (w *Worker) Run(ctx context.Context) error {
 		jetstream.PullMaxMessages(1),
 	}, func(msg jetstream.Msg) {
 		w.logger.Info("received a new job")
+		w.logger.Info("committing")
+		if err := msg.InProgress(); err != nil {
+			w.logger.Error("failed to send the initial in progress message", zap.Error(err), zap.Any("msg", msg))
+		}
+		ticker := time.NewTicker(15 * time.Second)
+		go func() {
+			for range ticker.C {
+				if err := msg.InProgress(); err != nil {
+					w.logger.Error("failed to send an in progress message", zap.Error(err), zap.Any("msg", msg))
+				}
+			}
+		}()
 
-		defer msg.Ack()
-
-		ctx, cancel := context.WithTimeoutCause(ctx, time.Minute*25, errors.New("describe worker timed out"))
-		defer cancel()
-
-		if err := w.ProcessMessage(ctx, msg); err != nil {
+		err := w.ProcessMessage(ctx, msg)
+		if err != nil {
 			w.logger.Error("failed to process message", zap.Error(err))
 		}
-		err := msg.Ack()
-		if err != nil {
-			w.logger.Error("failed to ack message", zap.Error(err))
+		ticker.Stop()
+
+		if err := msg.Ack(); err != nil {
+			w.logger.Error("failed to send the ack message", zap.Error(err), zap.Any("msg", msg))
 		}
 
 		w.logger.Info("processing a job completed")
@@ -94,33 +103,52 @@ func (w *Worker) Run(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) error {
-	// TODO
+func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) (err error) {
 	var request scheduler.TaskRequest
 	if err := json.Unmarshal(msg.Data(), &request); err != nil {
 		w.logger.Error("Failed to unmarshal ComplianceReportJob results", zap.Error(err))
 		return err
 	}
 
-	scriptPath := "./task.sh"
-	cmd := exec.Command("bash", scriptPath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return err
-	}
+	var response *scheduler.TaskResponse
 
-	var response scheduler.TaskResponse
-	response.Result = output
+	defer func() {
+		if err != nil {
+			response.FailureMessage = err.Error()
+			response.Status = models.TaskRunStatusFailed
+		} else {
+			response.Status = models.TaskRunStatusFinished
+		}
+
+		responseJson, err := json.Marshal(response)
+		if err != nil {
+			w.logger.Error("failed to create job result json", zap.Error(err))
+			return
+		}
+
+		if _, err := w.jq.Produce(ctx, ResultTopicName, responseJson, fmt.Sprintf("task-run-result-%d", request.RunID)); err != nil {
+			w.logger.Error("failed to publish job result", zap.String("jobResult", string(responseJson)), zap.Error(err))
+		}
+	}()
+
 	response.RunID = request.RunID
-	response.Status = models.TaskRunStatusFinished
+	response.Status = models.TaskRunStatusInProgress
 	responseJson, err := json.Marshal(response)
 	if err != nil {
 		w.logger.Error("failed to create response json", zap.Error(err))
 		return err
 	}
 
-	if _, err = w.jq.Produce(ctx, ResultTopicName, responseJson, fmt.Sprintf("task-%d", request.RunID)); err != nil {
+	if _, err = w.jq.Produce(ctx, ResultTopicName, responseJson, fmt.Sprintf("task-run-inprogress-%d", request.RunID)); err != nil {
 		w.logger.Error("failed to publish job in progress", zap.String("response", string(responseJson)), zap.Error(err))
 	}
+
+	err = task.RunTask(ctx, w.logger, request, response)
+	if err != nil {
+		w.logger.Error("failed to publish job result", zap.String("response", string(responseJson)), zap.Error(err))
+		return err
+	}
+	response.Status = models.TaskRunStatusFinished
+
 	return nil
 }
