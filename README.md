@@ -1,11 +1,11 @@
 # Tasks Template
 
-Define a Task Image for Run by Opencomply Platform. User Can Define a Task Image and Run it on Opencomply Platform.
+Define a Task Image for Run by Opensecurity Platform. User Can Define a Task Image and Run it on Opencomply Platform.
 You can fork this repository and create your own task image.
 
 ## Task Definition
 
-Task is a set of instructions that can be executed by Opencomply Platform.
+Task is a set of instructions that can be executed by Opensecurity Platform.
 It should be run once every time it is executed. And have an output that can be written to a file.
 
 Defining a task has one main parts:
