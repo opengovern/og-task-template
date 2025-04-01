@@ -3,62 +3,75 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	fmt "fmt"
+	"fmt"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/opengovern/og-task-template/envs"
 	"github.com/opengovern/og-task-template/task"
 	"github.com/opengovern/og-util/pkg/jq"
+	"github.com/opengovern/og-util/pkg/opengovernance-es-sdk"
 	"github.com/opengovern/og-util/pkg/tasks"
 	"github.com/opengovern/opensecurity/services/tasks/db/models"
 	"github.com/opengovern/opensecurity/services/tasks/scheduler"
-	"github.com/opengovern/opensecurity/services/tasks/worker/consts"
 	"go.uber.org/zap"
-	"os"
+	"strconv"
 	"time"
 )
 
-var (
-	NatsURL         = os.Getenv(consts.NatsURLEnv)
-	NatsConsumer    = os.Getenv(consts.NatsConsumerEnv)
-	StreamName      = os.Getenv(consts.NatsStreamNameEnv)
-	TopicName       = os.Getenv(consts.NatsTopicNameEnv)
-	ResultTopicName = os.Getenv(consts.NatsResultTopicNameEnv)
-)
-
 type Worker struct {
-	logger *zap.Logger
-	jq     *jq.JobQueue
+	logger   *zap.Logger
+	jq       *jq.JobQueue
+	esClient opengovernance.Client
 }
 
 func NewWorker(
 	logger *zap.Logger,
 	ctx context.Context,
 ) (*Worker, error) {
-	jq, err := jq.New(NatsURL, logger)
+	jq, err := jq.New(envs.NatsURL, logger)
 	if err != nil {
-		logger.Error("failed to create job queue", zap.Error(err), zap.String("url", NatsURL))
+		logger.Error("failed to create job queue", zap.Error(err), zap.String("url", envs.NatsURL))
 		return nil, err
 	}
 
-	logger.Info("Subscribing to stream", zap.String("stream", StreamName),
-		zap.Strings("topics", []string{TopicName, ResultTopicName}))
-	if err := jq.Stream(ctx, StreamName, "task job queue", []string{TopicName, ResultTopicName}, 100); err != nil {
+	logger.Info("Subscribing to stream", zap.String("stream", envs.StreamName),
+		zap.Strings("topics", []string{envs.TopicName, envs.ResultTopicName}))
+	if err := jq.Stream(ctx, envs.StreamName, "task job queue", []string{envs.TopicName, envs.ResultTopicName}, 100); err != nil {
 		logger.Error("failed to create stream", zap.Error(err))
 		return nil, err
 	}
 
+	isOnAks := false
+	isOnAks, _ = strconv.ParseBool(envs.ESIsOnAks)
+	isOpenSearch := false
+	isOpenSearch, _ = strconv.ParseBool(envs.ESIsOpenSearch)
+
+	esClient, err := opengovernance.NewClient(opengovernance.ClientConfig{
+		Addresses:     []string{envs.ESAddress},
+		Username:      &envs.ESUsername,
+		Password:      &envs.ESPassword,
+		IsOnAks:       &isOnAks,
+		IsOpenSearch:  &isOpenSearch,
+		AwsRegion:     &envs.ESAwsRegion,
+		AssumeRoleArn: &envs.ESAssumeRoleArn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	w := &Worker{
-		logger: logger,
-		jq:     jq,
+		logger:   logger,
+		jq:       jq,
+		esClient: esClient,
 	}
 
 	return w, nil
 }
 
 func (w *Worker) Run(ctx context.Context) error {
-	w.logger.Info("starting to consume", zap.String("url", NatsURL), zap.String("consumer", NatsConsumer),
-		zap.String("stream", StreamName), zap.String("topic", TopicName))
+	w.logger.Info("starting to consume", zap.String("url", envs.NatsURL), zap.String("consumer", envs.NatsConsumer),
+		zap.String("stream", envs.StreamName), zap.String("topic", envs.TopicName))
 
-	consumeCtx, err := w.jq.ConsumeWithConfig(ctx, NatsConsumer, StreamName, []string{TopicName}, jetstream.ConsumerConfig{
+	consumeCtx, err := w.jq.ConsumeWithConfig(ctx, envs.NatsConsumer, envs.StreamName, []string{envs.TopicName}, jetstream.ConsumerConfig{
 		Replicas:          1,
 		AckPolicy:         jetstream.AckExplicitPolicy,
 		DeliverPolicy:     jetstream.DeliverAllPolicy,
@@ -133,7 +146,7 @@ func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) (err err
 			return
 		}
 
-		if _, err := w.jq.Produce(ctx, ResultTopicName, responseJson, fmt.Sprintf("task-run-result-%d", request.TaskDefinition.RunID)); err != nil {
+		if _, err := w.jq.Produce(ctx, envs.ResultTopicName, responseJson, fmt.Sprintf("task-run-result-%d", request.TaskDefinition.RunID)); err != nil {
 			w.logger.Error("failed to publish job result", zap.String("jobResult", string(responseJson)), zap.Error(err))
 		}
 	}()
@@ -144,11 +157,11 @@ func (w *Worker) ProcessMessage(ctx context.Context, msg jetstream.Msg) (err err
 		return err
 	}
 
-	if _, err = w.jq.Produce(ctx, ResultTopicName, responseJson, fmt.Sprintf("task-run-inprogress-%d", request.TaskDefinition.RunID)); err != nil {
+	if _, err = w.jq.Produce(ctx, envs.ResultTopicName, responseJson, fmt.Sprintf("task-run-inprogress-%d", request.TaskDefinition.RunID)); err != nil {
 		w.logger.Error("failed to publish job in progress", zap.String("response", string(responseJson)), zap.Error(err))
 	}
 
-	err = task.RunTask(ctx, w.logger, request, response)
+	err = task.RunTask(ctx, w.jq, envs.InventoryServiceEndpoint, w.esClient, w.logger, request, response)
 	if err != nil {
 		w.logger.Error("failed to publish job result", zap.String("response", string(responseJson)), zap.Error(err))
 		return err
