@@ -4,7 +4,7 @@ go 1.23.3
 
 require (
 	github.com/nats-io/nats.go v1.38.0
-	github.com/opengovern/og-util v1.14.2
+	github.com/opengovern/og-util v1.15.1
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.36.0
@@ -36,7 +36,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/nkeys v0.4.9 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/opengovern/opensecurity v0.0.0-20250328105338-c1615913d6ee // indirect
+	github.com/opengovern/opensecurity v0.0.0-20250415231055-3c26d1e04f2c // indirect
 	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.1 // indirect

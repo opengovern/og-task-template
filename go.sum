@@ -170,8 +170,12 @@ github.com/opengovern/og-util v1.1.9/go.mod h1:dyn8rhmxq59o1jnbgGfmcUvW7iB/eN6Ox
 github.com/opengovern/og-util v1.1.12 h1:D/fIm5qernDnneN0gGyLClFhnE7mWAdD0UfFufV4+Zc=
 github.com/opengovern/og-util v1.1.12/go.mod h1:dyn8rhmxq59o1jnbgGfmcUvW7iB/eN6OxoTUUx6jEHA=
 github.com/opengovern/og-util v1.14.2/go.mod h1:9uNpGalixRoQkUzPPBdT+JG1epg8FTRx/qmkfTyUZHE=
+github.com/opengovern/og-util v1.15.1 h1:k1pYQmmp3e/O/uMZwg2IRm6kB6uOUrPjsHcsZi7SMUA=
+github.com/opengovern/og-util v1.15.1/go.mod h1:Uel/Gln5+a7L43XQISp1gLRR0nJYKbnsgRmitPMwFLk=
 github.com/opengovern/opensecurity v0.0.0-20250328105338-c1615913d6ee h1:LZFl/oKK5AB8na0oBXqBLKNyoFWGbOiWF7m+67XOG0U=
 github.com/opengovern/opensecurity v0.0.0-20250328105338-c1615913d6ee/go.mod h1:+/hQxFT5mxQnI9p01GSLbUos0ZVFp7nS08x1Yyiy9aY=
+github.com/opengovern/opensecurity v0.0.0-20250415231055-3c26d1e04f2c h1:z+5Nl1sjAoAf08q3Bdk4BUUnjTbQ5hGuNuBi8j5G8Hs=
+github.com/opengovern/opensecurity v0.0.0-20250415231055-3c26d1e04f2c/go.mod h1:wB0Qr9GPK/j+4p/VEoWfcSp+Dkyf47RqVJsdoZVL1uI=
 github.com/opengovern/opensecurity v0.524.14 h1:bpaoUnmAQQVEnndSDXfdKVo/J5L7QQ888qc1BG+hhfc=
 github.com/opengovern/opensecurity v0.524.14/go.mod h1:LnCUAuO6yKZv2BzOnxgJv4GjA6t0TXf7/xIgPxUBjl8=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
